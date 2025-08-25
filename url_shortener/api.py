@@ -7,8 +7,8 @@ import string
 from sqlalchemy import select
 from contextlib import asynccontextmanager
 
-from connection import get_session, engine
-from orm import URL
+from url_shortener.connection import get_session, engine
+from url_shortener.orm import URL
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
@@ -43,7 +43,7 @@ async def post_url(url: URL, session: SessionDep):
 
 @app.get("/{short_url}")
 async def get_url(short_url: str, session: SessionDep):
-    result = await session.exec(select(URL).where(URL.short_url == short_url))
+    result = await session.execute(select(URL).where(URL.short_url == short_url))
     url = result.scalar_one_or_none()
 
     if not url:
