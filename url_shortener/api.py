@@ -1,4 +1,4 @@
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
 from typing import Annotated
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -6,6 +6,8 @@ import random
 import string
 from sqlalchemy import select
 from contextlib import asynccontextmanager
+from redis import asyncio as aioredis
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from url_shortener.connection import get_session, engine
 from url_shortener.orm import URL
@@ -21,15 +23,26 @@ async def create_db_and_tables():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await create_db_and_tables()
+
+    app.state.redis_client = aioredis.from_url(
+        "redis://localhost:6379", encoding="utf-8", decode_responses=True
+    )
+
     yield
 
+    await app.state.redis_client.close()
 
+
+# Create app
 app = FastAPI(lifespan=lifespan)
+
+# Instrument BEFORE app starts
+Instrumentator().instrument(app).expose(app)
 
 
 def generate_random_code(k: int = 6) -> str:
     """Generate random string of length k"""
-    return "".join("".join(random.choices(string.ascii_uppercase + string.digits, k=k)))
+    return "".join(random.choices(string.ascii_uppercase + string.digits, k=k))
 
 
 @app.post("/")
@@ -42,10 +55,19 @@ async def post_url(url: URL, session: SessionDep):
 
 
 @app.get("/{short_url}")
-async def get_url(short_url: str, session: SessionDep):
+async def get_url(short_url: str, session: SessionDep, request: Request):
+    redis_client = request.app.state.redis_client
+
+    cached_url = await redis_client.get(short_url)
+    if cached_url:
+        return {"original_url": cached_url, "source": "cache"}
+
     result = await session.execute(select(URL).where(URL.short_url == short_url))
     url = result.scalar_one_or_none()
 
     if not url:
         raise HTTPException(status_code=404, detail="URL not found")
+
+    await redis_client.set(short_url, url.original_url, ex=3600)
+
     return url

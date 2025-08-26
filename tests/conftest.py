@@ -3,11 +3,12 @@ from httpx import AsyncClient
 from sqlmodel import SQLModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from httpx import ASGITransport
+from url_shortener.api import app
+from asgi_lifespan import LifespanManager
 
 pytest_plugins = ("pytest_asyncio",)
 
-from url_shortener.api import app
-from url_shortener.connection import engine, get_session, async_session
+from url_shortener.connection import engine, async_session
 
 
 @pytest_asyncio.fixture(name="session")
@@ -28,5 +29,14 @@ async def prepare_test_db():
 @pytest_asyncio.fixture
 async def client():
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
-        yield ac
+    async with LifespanManager(app):
+        async with AsyncClient(transport=transport, base_url="http://test") as ac:
+            yield ac
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def clear_redis():
+    # Access Redis client safely from app.state
+    await app.state.redis_client.flushdb()
+    yield
+    await app.state.redis_client.flushdb()
