@@ -1,6 +1,6 @@
 import pytest
 from httpx import AsyncClient
-from url_shortener.api import app
+from api import app
 
 
 @pytest.mark.asyncio

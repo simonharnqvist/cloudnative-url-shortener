@@ -8,9 +8,15 @@ from sqlalchemy import select
 from contextlib import asynccontextmanager
 from redis import asyncio as aioredis
 from prometheus_fastapi_instrumentator import Instrumentator
+from prometheus_fastapi_instrumentator.metrics import (
+    requests,
+    latency,
+    request_size,
+    response_size,
+)
 
-from url_shortener.connection import get_session, engine
-from url_shortener.orm import URL
+from connection import get_session, engine
+from orm import URL
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
@@ -25,7 +31,7 @@ async def lifespan(app: FastAPI):
     await create_db_and_tables()
 
     app.state.redis_client = aioredis.from_url(
-        "redis://localhost:6379", encoding="utf-8", decode_responses=True
+        "redis://redis:6379", encoding="utf-8", decode_responses=True
     )
 
     yield
@@ -33,11 +39,10 @@ async def lifespan(app: FastAPI):
     await app.state.redis_client.close()
 
 
-# Create app
 app = FastAPI(lifespan=lifespan)
-
-# Instrument BEFORE app starts
-Instrumentator().instrument(app).expose(app)
+Instrumentator().add(requests()).add(latency()).add(request_size()).add(
+    response_size()
+).instrument(app).expose(app)
 
 
 def generate_random_code(k: int = 6) -> str:

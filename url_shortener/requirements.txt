@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+prometheus-fastapi-instrumentator
+redis
+asyncpg
+sqlalchemy
+sqlmodel
