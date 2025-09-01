@@ -5,8 +5,10 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      - redis
-      - postgres
+      redis:
+            condition: 'service_started'
+      postgres:
+            condition: 'service_healthy'
     networks:
       - backend
 
@@ -29,6 +31,11 @@ services:
       - "5432:5432"
     networks:
       - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   prometheus:
     image: prom/prometheus:latest

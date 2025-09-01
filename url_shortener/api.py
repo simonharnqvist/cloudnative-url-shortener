@@ -1,4 +1,5 @@
 from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.responses import RedirectResponse
 from typing import Annotated
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -65,14 +66,18 @@ async def get_url(short_url: str, session: SessionDep, request: Request):
 
     cached_url = await redis_client.get(short_url)
     if cached_url:
-        return {"original_url": cached_url, "source": "cache"}
+        return RedirectResponse(url=cached_url, status_code=303)
 
     result = await session.execute(select(URL).where(URL.short_url == short_url))
-    url = result.scalar_one_or_none()
+    url: URL = result.scalar_one_or_none()
+    if not isinstance(url, URL):
+        raise HTTPException(status_code=500, detail="URL type invalid")
+    if not isinstance(url.original_url, str):
+        raise HTTPException(status_code=500, detail="URL type invalid")
 
     if not url:
         raise HTTPException(status_code=404, detail="URL not found")
 
     await redis_client.set(short_url, url.original_url, ex=3600)
 
-    return url
+    return RedirectResponse(url=url.original_url, status_code=303)
