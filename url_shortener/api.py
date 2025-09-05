@@ -1,4 +1,4 @@
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request, APIRouter
 from fastapi.responses import RedirectResponse
 from typing import Annotated
 from sqlmodel import SQLModel
@@ -15,9 +15,13 @@ from prometheus_fastapi_instrumentator.metrics import (
     request_size,
     response_size,
 )
+from datetime import datetime, timezone
 
-from connection import get_session, engine
+
+from connection import get_session, engine, logs_collection
 from orm import URL
+
+print("🚀 api.py is running")
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
@@ -71,13 +75,35 @@ async def get_url(short_url: str, session: SessionDep, request: Request):
     result = await session.execute(select(URL).where(URL.short_url == short_url))
     url: URL = result.scalar_one_or_none()
     if not isinstance(url, URL):
-        raise HTTPException(status_code=500, detail="URL type invalid")
+        raise HTTPException(
+            status_code=500, detail=f"URL type invalid - not URL object but {type(url)}"
+        )
     if not isinstance(url.original_url, str):
-        raise HTTPException(status_code=500, detail="URL type invalid")
+        raise HTTPException(status_code=500, detail="URL type invalid - not string")
 
     if not url:
         raise HTTPException(status_code=404, detail="URL not found")
 
+    client_ip = request.client.host
+
+    await logs_collection.insert_one(
+        {
+            "short_code": short_url,
+            "ip": client_ip,
+            "timestamp": datetime.now(timezone.utc),
+            "user_agent": request.headers.get("user-agent"),
+        }
+    )
+
     await redis_client.set(short_url, url.original_url, ex=3600)
 
     return RedirectResponse(url=url.original_url, status_code=303)
+
+
+@app.get("/logs")
+async def get_logs():
+    logs_cursor = logs_collection.find({})
+    logs = await logs_cursor.to_list(length=100)
+    for log in logs:
+        log["_id"] = str(log["_id"])
+    return logs

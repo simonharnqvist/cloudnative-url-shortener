@@ -9,6 +9,8 @@ services:
             condition: 'service_started'
       postgres:
             condition: 'service_healthy'
+      mongo:
+            condition: 'service_started'
     networks:
       - backend
 
@@ -56,6 +58,22 @@ services:
       - prometheus
     networks:
       - backend
+
+  mongo:
+    image: mongo:latest
+    container_name: mongodb
+    ports:
+      - "27017:27017"
+    networks:
+      - backend
+    volumes:
+      - mongo_data:/data/db
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root 
+      MONGO_INITDB_ROOT_PASSWORD: example
+  
+volumes:
+  mongo_data:
 
 networks:
   backend:
