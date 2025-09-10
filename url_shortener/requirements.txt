@@ -6,3 +6,4 @@ asyncpg
 sqlalchemy
 sqlmodel
 motor
+dotenv

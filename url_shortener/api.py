@@ -6,8 +6,6 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 import random
 import string
 from sqlalchemy import select
-from contextlib import asynccontextmanager
-from redis import asyncio as aioredis
 from prometheus_fastapi_instrumentator import Instrumentator
 from prometheus_fastapi_instrumentator.metrics import (
     requests,
@@ -18,7 +16,7 @@ from prometheus_fastapi_instrumentator.metrics import (
 from datetime import datetime, timezone
 
 
-from connection import get_session, engine, logs_collection
+from connection import get_session, engine, logs_collection, lifespan
 from orm import URL
 from urllib.parse import urlparse
 
@@ -26,27 +24,12 @@ import logging
 
 logging.basicConfig(level=logging.DEBUG)
 
-print("🚀 api.py is running")
-
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
 
 async def create_db_and_tables():
     async with engine.begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    await create_db_and_tables()
-
-    app.state.redis_client = aioredis.from_url(
-        "redis://redis:6379", encoding="utf-8", decode_responses=True
-    )
-
-    yield
-
-    await app.state.redis_client.close()
 
 
 app = FastAPI(lifespan=lifespan)
