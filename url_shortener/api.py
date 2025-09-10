@@ -20,6 +20,11 @@ from datetime import datetime, timezone
 
 from connection import get_session, engine, logs_collection
 from orm import URL
+from urllib.parse import urlparse
+
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
 
 print("🚀 api.py is running")
 
@@ -55,6 +60,13 @@ def generate_random_code(k: int = 6) -> str:
     return "".join(random.choices(string.ascii_uppercase + string.digits, k=k))
 
 
+def ensure_url_scheme(url: str) -> str:
+    parsed = urlparse(url)
+    if not parsed.scheme:
+        return "http://" + url
+    return url
+
+
 @app.post("/")
 async def post_url(url: URL, session: SessionDep):
     url.short_url = generate_random_code()
@@ -73,16 +85,15 @@ async def get_url(short_url: str, session: SessionDep, request: Request):
         return RedirectResponse(url=cached_url, status_code=303)
 
     result = await session.execute(select(URL).where(URL.short_url == short_url))
-    url: URL = result.scalar_one_or_none()
-    if not isinstance(url, URL):
+    url: URL | None = result.scalar_one_or_none()
+    if not url:
+        raise HTTPException(status_code=404, detail="URL not found")
+    elif not isinstance(url, URL):
         raise HTTPException(
             status_code=500, detail=f"URL type invalid - not URL object but {type(url)}"
         )
-    if not isinstance(url.original_url, str):
+    elif not isinstance(url.original_url, str):
         raise HTTPException(status_code=500, detail="URL type invalid - not string")
-
-    if not url:
-        raise HTTPException(status_code=404, detail="URL not found")
 
     client_ip = request.client.host
 
@@ -96,8 +107,8 @@ async def get_url(short_url: str, session: SessionDep, request: Request):
     )
 
     await redis_client.set(short_url, url.original_url, ex=3600)
-
-    return RedirectResponse(url=url.original_url, status_code=303)
+    redirect_target = ensure_url_scheme(url.original_url)
+    return RedirectResponse(url=redirect_target, status_code=303)
 
 
 @app.get("/logs")
