@@ -1,11 +1,13 @@
-from fastapi import Depends, FastAPI, HTTPException, Request, APIRouter
-from fastapi.responses import RedirectResponse
+from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.responses import RedirectResponse, Response
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from typing import Annotated
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 import random
 import string
 from sqlalchemy import select
+from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
 from prometheus_fastapi_instrumentator import Instrumentator
 from prometheus_fastapi_instrumentator.metrics import (
     requests,
@@ -14,13 +16,11 @@ from prometheus_fastapi_instrumentator.metrics import (
     response_size,
 )
 from datetime import datetime, timezone
-
-
 from connection import get_session, engine, logs_collection, lifespan
 from orm import URL
 from urllib.parse import urlparse
-
 import logging
+from auth import verify_api_token
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -35,7 +35,9 @@ async def create_db_and_tables():
 app = FastAPI(lifespan=lifespan)
 Instrumentator().add(requests()).add(latency()).add(request_size()).add(
     response_size()
-).instrument(app).expose(app)
+).instrument(app)
+
+security = HTTPBasic()
 
 
 def generate_random_code(k: int = 6) -> str:
@@ -57,6 +59,20 @@ async def post_url(url: URL, session: SessionDep):
     await session.commit()
     await session.refresh(url)
     return url
+
+
+@app.get("/metrics", include_in_schema=False)
+async def get_metrics(_=Depends(verify_api_token)):
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
+
+@app.get("/logs", include_in_schema=False)
+async def get_logs(_=Depends(verify_api_token)):
+    logs_cursor = logs_collection.find({})
+    logs = await logs_cursor.to_list(length=100)
+    for log in logs:
+        log["_id"] = str(log["_id"])
+    return logs
 
 
 @app.get("/{short_url}")
@@ -92,12 +108,3 @@ async def get_url(short_url: str, session: SessionDep, request: Request):
     await redis_client.set(short_url, url.original_url, ex=3600)
     redirect_target = ensure_url_scheme(url.original_url)
     return RedirectResponse(url=redirect_target, status_code=303)
-
-
-@app.get("/logs")
-async def get_logs():
-    logs_cursor = logs_collection.find({})
-    logs = await logs_cursor.to_list(length=100)
-    for log in logs:
-        log["_id"] = str(log["_id"])
-    return logs
