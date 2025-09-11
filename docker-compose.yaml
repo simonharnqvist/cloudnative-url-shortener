@@ -2,8 +2,30 @@ services:
   fastapi:
     build: ./url_shortener
     container_name: fastapi_app
+    env_file:
+      - url_shortener/.env
+    environment:
+      - RUN_MODE=app
     ports:
       - "8000:8000"
+    depends_on:
+      redis:
+            condition: 'service_started'
+      postgres:
+            condition: 'service_healthy'
+      mongo:
+            condition: 'service_started'
+    networks:
+      - backend
+
+  test_runner:
+    build: ./url_shortener
+    command: pytest tests/ --disable-warnings
+    working_dir: /app
+    environment:
+      - RUN_MODE=test
+    env_file:
+      - url_shortener/.env
     depends_on:
       redis:
             condition: 'service_started'
@@ -71,6 +93,7 @@ services:
     environment:
       MONGO_INITDB_ROOT_USERNAME: root 
       MONGO_INITDB_ROOT_PASSWORD: example
+
   
 volumes:
   mongo_data:

@@ -9,12 +9,15 @@ from contextlib import asynccontextmanager
 import os
 from redis import asyncio as aioredis
 from fastapi import FastAPI
+from pathlib import Path
 
-load_dotenv(".env")
+load_dotenv()
 
 POSTGRES_URI = os.getenv("POSTGRES_URI")
 MONGO_URI = os.getenv("MONGO_URI")
 REDIS_URI = os.getenv("REDIS_URI")
+
+assert None not in [POSTGRES_URI, MONGO_URI, REDIS_URI]
 
 engine = create_async_engine(POSTGRES_URI, echo=True, poolclass=NullPool)
 

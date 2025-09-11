@@ -16,11 +16,16 @@ from prometheus_fastapi_instrumentator.metrics import (
     response_size,
 )
 from datetime import datetime, timezone
-from connection import get_session, engine, logs_collection, lifespan
-from orm import URL
+from url_shortener.connection import (
+    get_session,
+    engine,
+    logs_collection,
+    lifespan,
+)
+from url_shortener.orm import URL
 from urllib.parse import urlparse
 import logging
-from auth import verify_api_token
+from url_shortener.auth import verify_api_token
 
 logging.basicConfig(level=logging.DEBUG)
 

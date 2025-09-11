@@ -28,3 +28,6 @@ dev = [
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["url_shortener*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
