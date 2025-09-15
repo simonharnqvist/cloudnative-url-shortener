@@ -25,7 +25,7 @@ services:
     environment:
       - RUN_MODE=test
     env_file:
-      - url_shortener/.env.test
+      - url_shortener/.env
     depends_on:
       redis:
             condition: 'service_started'

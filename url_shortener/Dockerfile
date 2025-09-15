@@ -6,7 +6,7 @@ COPY requirements.txt .
 COPY . .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY ./ .
+COPY .env.test .env
 
 RUN pip install .
 RUN pip list && python -c "import url_shortener" || echo 'Not found!'
