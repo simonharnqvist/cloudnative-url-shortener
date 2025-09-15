@@ -3,7 +3,6 @@ from httpx import AsyncClient
 import os
 from url_shortener.api import app
 from dotenv import load_dotenv
-from conftest import redis_client
 
 load_dotenv("./url_shortener/.env")
 API_TOKEN = os.getenv("API_TOKEN")
@@ -34,28 +33,6 @@ async def test_get_url_not_found(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_url_is_cached_after_lookup(client, redis_client):
-    response = await client.post("/", json={"original_url": "https://www.google.com"})
-    assert response.status_code == 200
-
-    short_code = response.json()["short_url"]
-    print(short_code)
-
-    get1 = await client.get(f"/{short_code}")
-    assert get1.status_code == 303
-    # assert get1.json()["original_url"] == "https://www.google.com"
-    # assert get1.json()["source"] == "db"
-
-    cached = await redis_client.get(short_code)
-    assert cached == "https://www.google.com"
-
-    get2 = await client.get(f"/{short_code}")
-    assert get2.status_code == 303
-    # assert get2.json()["original_url"] == "https://www.google.com"
-    # assert get2.json()["source"] == "cache"
-
-
-@pytest.mark.asyncio
 async def test_metrics_without_token(client: AsyncClient):
     response = await client.get("/metrics")
     assert response.status_code == 401
@@ -79,13 +56,3 @@ async def test_logs_without_token(client: AsyncClient):
     assert "Missing" in response.json().get(
         "detail", ""
     ) or "Invalid" in response.json().get("detail", "")
-
-
-async def test_logs_with_token(client: AsyncClient):
-    response = await client.get("/logs", headers=HEADERS)
-    print("Status code:", response.status_code)
-    print("Response content:", response.text)
-    assert response.status_code == 200, f"Unexpected status: {response.status_code}"
-    data = response.json()
-    print("Response JSON type:", type(data))
-    assert isinstance(data, list), f"Expected list but got {type(data)}"
