@@ -2,9 +2,7 @@ import pytest
 from httpx import AsyncClient
 import os
 from url_shortener.api import app
-from dotenv import load_dotenv
 
-load_dotenv("./url_shortener/.env.test")
 API_TOKEN = os.getenv("API_TOKEN")
 HEADERS = {"Authorization": f"Bearer {API_TOKEN}"}
 assert API_TOKEN, "API_TOKEN is not set in environment"

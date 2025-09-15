@@ -1,9 +1,6 @@
-from dotenv import load_dotenv
 import os
 from fastapi import Request, HTTPException, status, Depends
 import secrets
-
-load_dotenv()
 
 API_TOKEN = os.getenv("API_TOKEN")
 

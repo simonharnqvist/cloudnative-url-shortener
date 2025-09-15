@@ -4,14 +4,11 @@ from sqlmodel import SQLModel
 from sqlalchemy.pool import NullPool
 from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo.server_api import ServerApi
-from dotenv import load_dotenv
 from contextlib import asynccontextmanager
 import os
 from redis import asyncio as aioredis
 from fastapi import FastAPI
 from pathlib import Path
-
-load_dotenv()
 
 POSTGRES_URI = os.getenv("POSTGRES_URI")
 MONGO_URI = os.getenv("MONGO_URI")
